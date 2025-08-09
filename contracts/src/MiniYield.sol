@@ -61,4 +61,45 @@ contract MiniYield is ReentrancyGuard, Ownable {
         feeCollector = msg.sender;
     }
 
+    //Core Functions
+
+    /**
+    * Deposit tokens to start earning Yield
+    * The token address to deposit
+    * The amount to deposit
+    */
+    function deposit(address token, uint256 amount)
+        external
+        nonReentrant
+        notPaused
+        validToken(token)
+    {
+        require(amount > 0, "Amount must be greater than 0");
+
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        
+        uint256 shares = calculateShares(token, amount);
+        
+        UserBalance storage userBalance = userBalances[msg.sender][token];
+        
+        // Update user balance
+        userBalance.totalDeposited += amount;
+        userBalance.shares += shares;
+        userBalance.lastRewardTimestamp = block.timestamp;
+        
+        // Update global state
+        totalSupply[token] += shares;
+        totalAssets[token] += amount;
+        
+        // Deposit to active protocol
+        _depositToActiveProtocol(token, amount);
+        
+        emit Deposit(msg.sender, token, amount, block.timestamp);
+    }
+    
+
+
+
+
+
 }
