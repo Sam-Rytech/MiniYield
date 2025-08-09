@@ -46,4 +46,19 @@ contract MiniYield is ReentrancyGuard, Ownable {
     address public feeCollector;
     bool public paused = false;
 
+    // Modifiers
+    modifier notPaused() {
+        require(!paused, "Contract is paused");
+        _;
+    }
+
+    modifier validToken(address token) {
+        require(isTokenSupported(token), "Token not supported");
+        _;
+    }
+
+    constructor() {
+        feeCollector = msg.sender;
+    }
+
 }
