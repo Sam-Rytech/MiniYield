@@ -97,6 +97,48 @@ contract MiniYield is ReentrancyGuard, Ownable {
         emit Deposit(msg.sender, token, amount, block.timestamp);
     }
     
+    /**
+     * Withdraw tokens and any earned yield
+     * The token address to withdraw
+     * The amount to withdraw (0 = withdraw all)
+     */
+     
+    function withdraw(address token, uint256 amount) 
+        external 
+        nonReentrant 
+        notPaused 
+        validToken(token) 
+    {
+        UserBalance storage userBalance = userBalances[msg.sender][token];
+        require(userBalance.shares > 0, "No balance to withdraw");
+        
+        uint256 userTotalValue = getUserTotalValue(msg.sender, token);
+        uint256 withdrawAmount = amount == 0 ? userTotalValue : amount;
+        
+        require(withdrawAmount <= userTotalValue, "Insufficient balance");
+        
+        uint256 sharesToBurn = calculateSharesToBurn(token, withdrawAmount);
+        
+        // Update user balance
+        userBalance.shares -= sharesToBurn;
+        if (userBalance.shares == 0) {
+            userBalance.totalDeposited = 0;
+        } else {
+            userBalance.totalDeposited = (userBalance.totalDeposited * userBalance.shares) / (userBalance.shares + sharesToBurn);
+        }
+        
+        // Update global state
+        totalSupply[token] -= sharesToBurn;
+        totalAssets[token] -= withdrawAmount;
+        
+        // Withdraw from active protocol
+        _withdrawFromActiveProtocol(token, withdrawAmount);
+        
+        // Transfer tokens to user
+        IERC20(token).safeTransfer(msg.sender, withdrawAmount);
+        
+        emit Withdraw(msg.sender, token, withdrawAmount, block.timestamp);
+    }
 
 
 
