@@ -1,13 +1,23 @@
 {
-  "name": "voting-dapp",
-  "version": "0.1.0",
-  "private": true,
+  "name": "miniyield-contracts",
+  "version": "1.0.0",
   "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:gas": "REPORT_GAS=true npx hardhat test",
+    "deploy:local": "npx hardhat run scripts/deploy.js --network hardhat",
+    "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia",
+    "deploy:base-sepolia": "npx hardhat run scripts/deploy.js --network baseSepolia",
+    "verify:sepolia": "npx hardhat run scripts/verify.js --network sepolia",
+    "verify:base-sepolia": "npx hardhat run scripts/verify.js --network baseSepolia",
+    "node": "npx hardhat node",
+    "console": "npx hardhat console"
   },
+  "private": true,
   "dependencies": {
     "react": "19.1.0",
     "react-dom": "19.1.0",
