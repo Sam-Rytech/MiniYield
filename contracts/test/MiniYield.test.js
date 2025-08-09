@@ -1,6 +1,6 @@
-const { expect } = require('chai')
-const { ethers } = require('hardhat')
-const { loadFixture } = require('@nomicfoundation/hardhat-network-helpers')
+import { expect } from 'chai'
+import { ethers } from 'hardhat'
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
 
 describe('MiniYield', function () {
   async function deployMiniYieldFixture() {
@@ -61,13 +61,18 @@ describe('MiniYield', function () {
 
       await miniYield
         .connect(owner)
-        .addProtocol(mockToken.target, mockProtocol.target)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol.getAddress()
+        )
 
-      const protocolCount = await miniYield.getProtocolCount(mockToken.target)
+      const protocolCount = await miniYield.getProtocolCount(
+        await mockToken.getAddress()
+      )
       expect(protocolCount).to.equal(1)
 
       const supportedTokens = await miniYield.getSupportedTokens()
-      expect(supportedTokens).to.include(mockToken.target)
+      expect(supportedTokens).to.include(await mockToken.getAddress())
     })
 
     it('Should not allow non-owner to add protocol', async function () {
@@ -78,7 +83,10 @@ describe('MiniYield', function () {
       await expect(
         miniYield
           .connect(user1)
-          .addProtocol(mockToken.target, mockProtocol.target)
+          .addProtocol(
+            await mockToken.getAddress(),
+            await mockProtocol.getAddress()
+          )
       ).to.be.revertedWith('Ownable: caller is not the owner')
     })
   })
@@ -91,22 +99,34 @@ describe('MiniYield', function () {
       // Setup protocol
       await miniYield
         .connect(owner)
-        .addProtocol(mockToken.target, mockProtocol.target)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol.getAddress()
+        )
 
       // User approves and deposits
       const depositAmount = ethers.parseUnits('100', 6)
-      await mockToken.connect(user1).approve(miniYield.target, depositAmount)
+      await mockToken
+        .connect(user1)
+        .approve(await miniYield.getAddress(), depositAmount)
 
       await expect(
-        miniYield.connect(user1).deposit(mockToken.target, depositAmount)
+        miniYield
+          .connect(user1)
+          .deposit(await mockToken.getAddress(), depositAmount)
       )
         .to.emit(miniYield, 'Deposit')
-        .withArgs(user1.address, mockToken.target, depositAmount, anyValue)
+        .withArgs(
+          user1.address,
+          await mockToken.getAddress(),
+          depositAmount,
+          await ethers.provider.getBlock().then((b) => b.timestamp + 1)
+        )
 
       // Check user balance
       const userBalance = await miniYield.userBalances(
         user1.address,
-        mockToken.target
+        await mockToken.getAddress()
       )
       expect(userBalance.totalDeposited).to.equal(depositAmount)
       expect(userBalance.shares).to.equal(depositAmount) // 1:1 for first deposit
@@ -118,10 +138,14 @@ describe('MiniYield', function () {
       )
 
       const depositAmount = ethers.parseUnits('100', 6)
-      await mockToken.connect(user1).approve(miniYield.target, depositAmount)
+      await mockToken
+        .connect(user1)
+        .approve(await miniYield.getAddress(), depositAmount)
 
       await expect(
-        miniYield.connect(user1).deposit(mockToken.target, depositAmount)
+        miniYield
+          .connect(user1)
+          .deposit(await mockToken.getAddress(), depositAmount)
       ).to.be.revertedWith('Token not supported')
     })
 
@@ -131,10 +155,13 @@ describe('MiniYield', function () {
 
       await miniYield
         .connect(owner)
-        .addProtocol(mockToken.target, mockProtocol.target)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol.getAddress()
+        )
 
       await expect(
-        miniYield.connect(user1).deposit(mockToken.target, 0)
+        miniYield.connect(user1).deposit(await mockToken.getAddress(), 0)
       ).to.be.revertedWith('Amount must be greater than 0')
     })
   })
@@ -147,23 +174,37 @@ describe('MiniYield', function () {
       // Setup and deposit
       await miniYield
         .connect(owner)
-        .addProtocol(mockToken.target, mockProtocol.target)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol.getAddress()
+        )
       const depositAmount = ethers.parseUnits('100', 6)
-      await mockToken.connect(user1).approve(miniYield.target, depositAmount)
-      await miniYield.connect(user1).deposit(mockToken.target, depositAmount)
+      await mockToken
+        .connect(user1)
+        .approve(await miniYield.getAddress(), depositAmount)
+      await miniYield
+        .connect(user1)
+        .deposit(await mockToken.getAddress(), depositAmount)
 
       // Withdraw
       const withdrawAmount = ethers.parseUnits('50', 6)
       await expect(
-        miniYield.connect(user1).withdraw(mockToken.target, withdrawAmount)
+        miniYield
+          .connect(user1)
+          .withdraw(await mockToken.getAddress(), withdrawAmount)
       )
         .to.emit(miniYield, 'Withdraw')
-        .withArgs(user1.address, mockToken.target, withdrawAmount, anyValue)
+        .withArgs(
+          user1.address,
+          await mockToken.getAddress(),
+          withdrawAmount,
+          await ethers.provider.getBlock().then((b) => b.timestamp + 1)
+        )
 
       // Check remaining balance
       const userTotalValue = await miniYield.getUserTotalValue(
         user1.address,
-        mockToken.target
+        await mockToken.getAddress()
       )
       expect(userTotalValue).to.be.closeTo(
         depositAmount - withdrawAmount,
@@ -177,12 +218,15 @@ describe('MiniYield', function () {
 
       await miniYield
         .connect(owner)
-        .addProtocol(mockToken.target, mockProtocol.target)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol.getAddress()
+        )
 
       await expect(
         miniYield
           .connect(user1)
-          .withdraw(mockToken.target, ethers.parseUnits('100', 6))
+          .withdraw(await mockToken.getAddress(), ethers.parseUnits('100', 6))
       ).to.be.revertedWith('No balance to withdraw')
     })
   })
@@ -195,11 +239,14 @@ describe('MiniYield', function () {
 
       await miniYield
         .connect(owner)
-        .addProtocol(mockToken.target, mockProtocol.target)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol.getAddress()
+        )
 
       const depositAmount = ethers.parseUnits('100', 6)
       const shares = await miniYield.calculateShares(
-        mockToken.target,
+        await mockToken.getAddress(),
         depositAmount
       )
       expect(shares).to.equal(depositAmount)
@@ -212,35 +259,149 @@ describe('MiniYield', function () {
       // Setup
       await miniYield
         .connect(owner)
-        .addProtocol(mockToken.target, mockProtocol.target)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol.getAddress()
+        )
 
       // First user deposits
       const firstDeposit = ethers.parseUnits('100', 6)
-      await mockToken.connect(user1).approve(miniYield.target, firstDeposit)
-      await miniYield.connect(user1).deposit(mockToken.target, firstDeposit)
-
-      // Simulate some yield (manually update totalAssets for testing)
-      // In reality, this would come from protocol yield
+      await mockToken
+        .connect(user1)
+        .approve(await miniYield.getAddress(), firstDeposit)
+      await miniYield
+        .connect(user1)
+        .deposit(await mockToken.getAddress(), firstDeposit)
 
       // Second user deposits same amount
       const secondDeposit = ethers.parseUnits('100', 6)
-      await mockToken.connect(user2).approve(miniYield.target, secondDeposit)
-      await miniYield.connect(user2).deposit(mockToken.target, secondDeposit)
+      await mockToken
+        .connect(user2)
+        .approve(await miniYield.getAddress(), secondDeposit)
+      await miniYield
+        .connect(user2)
+        .deposit(await mockToken.getAddress(), secondDeposit)
 
       // Both users should have equal shares since they deposited same amount with no yield
       const user1Balance = await miniYield.userBalances(
         user1.address,
-        mockToken.target
+        await mockToken.getAddress()
       )
       const user2Balance = await miniYield.userBalances(
         user2.address,
-        mockToken.target
+        await mockToken.getAddress()
       )
 
       expect(user1Balance.shares).to.equal(user2Balance.shares)
     })
   })
-})
 
-// Helper function for testing events with timestamp
-const anyValue = require('@nomicfoundation/hardhat-chai-matchers/withArgs')
+  describe('Protocol Switching', function () {
+    it('Should allow owner to switch protocols', async function () {
+      const { miniYield, mockToken, mockProtocol, owner, user1 } =
+        await loadFixture(deployMiniYieldFixture)
+
+      // Deploy second protocol
+      const MockProtocol2 = await ethers.getContractFactory('MockYieldProtocol')
+      const mockProtocol2 = await MockProtocol2.deploy('Mock Protocol 2', 7000) // 7% APY
+
+      // Setup protocols
+      await miniYield
+        .connect(owner)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol.getAddress()
+        )
+      await miniYield
+        .connect(owner)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol2.getAddress()
+        )
+
+      // User deposits
+      const depositAmount = ethers.parseUnits('100', 6)
+      await mockToken
+        .connect(user1)
+        .approve(await miniYield.getAddress(), depositAmount)
+      await miniYield
+        .connect(user1)
+        .deposit(await mockToken.getAddress(), depositAmount)
+
+      // Switch protocol
+      await expect(
+        miniYield.connect(owner).switchProtocol(await mockToken.getAddress(), 1)
+      ).to.emit(miniYield, 'ProtocolSwitch')
+
+      // Verify active protocol changed
+      const [activeProtocol] = await miniYield.getActiveProtocol(
+        await mockToken.getAddress()
+      )
+      expect(activeProtocol).to.equal(await mockProtocol2.getAddress())
+    })
+
+    it('Should not allow non-owner to switch protocols', async function () {
+      const { miniYield, mockToken, mockProtocol, owner, user1 } =
+        await loadFixture(deployMiniYieldFixture)
+
+      await miniYield
+        .connect(owner)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol.getAddress()
+        )
+
+      await expect(
+        miniYield.connect(user1).switchProtocol(await mockToken.getAddress(), 0)
+      ).to.be.revertedWith('Ownable: caller is not the owner')
+    })
+  })
+
+  describe('Admin Functions', function () {
+    it('Should allow owner to pause and unpause', async function () {
+      const { miniYield, owner } = await loadFixture(deployMiniYieldFixture)
+
+      // Pause
+      await miniYield.connect(owner).pause()
+      expect(await miniYield.paused()).to.equal(true)
+
+      // Unpause
+      await miniYield.connect(owner).unpause()
+      expect(await miniYield.paused()).to.equal(false)
+    })
+
+    it('Should not allow non-owner to pause', async function () {
+      const { miniYield, user1 } = await loadFixture(deployMiniYieldFixture)
+
+      await expect(miniYield.connect(user1).pause()).to.be.revertedWith(
+        'Ownable: caller is not the owner'
+      )
+    })
+
+    it('Should reject deposits when paused', async function () {
+      const { miniYield, mockToken, mockProtocol, owner, user1 } =
+        await loadFixture(deployMiniYieldFixture)
+
+      // Setup
+      await miniYield
+        .connect(owner)
+        .addProtocol(
+          await mockToken.getAddress(),
+          await mockProtocol.getAddress()
+        )
+      await miniYield.connect(owner).pause()
+
+      // Try to deposit
+      const depositAmount = ethers.parseUnits('100', 6)
+      await mockToken
+        .connect(user1)
+        .approve(await miniYield.getAddress(), depositAmount)
+
+      await expect(
+        miniYield
+          .connect(user1)
+          .deposit(await mockToken.getAddress(), depositAmount)
+      ).to.be.revertedWith('Contract is paused')
+    })
+  })
+})
