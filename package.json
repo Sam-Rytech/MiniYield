@@ -19,12 +19,15 @@
   },
   "private": true,
   "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0",
+    "next": "15.4.5",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "next": "15.4.5"
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@tailwindcss/postcss": "^4",
+    "hardhat": "^2.26.2",
     "tailwindcss": "^4"
   }
 }
