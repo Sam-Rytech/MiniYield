@@ -61,21 +61,21 @@ contract MiniYield is ReentrancyGuard, Ownable {
         feeCollector = msg.sender;
     }
 
-    //Core Functions
-
+    // Core Functions
+    
     /**
-    * Deposit tokens to start earning Yield
-    * The token address to deposit
-    * The amount to deposit
-    */
-    function deposit(address token, uint256 amount)
-        external
-        nonReentrant
-        notPaused
-        validToken(token)
+     * @dev Deposit tokens to start earning yield
+     * @param token The token address to deposit
+     * @param amount The amount to deposit
+     */
+    function deposit(address token, uint256 amount) 
+        external 
+        nonReentrant 
+        notPaused 
+        validToken(token) 
     {
         require(amount > 0, "Amount must be greater than 0");
-
+        
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         
         uint256 shares = calculateShares(token, amount);
@@ -96,13 +96,12 @@ contract MiniYield is ReentrancyGuard, Ownable {
         
         emit Deposit(msg.sender, token, amount, block.timestamp);
     }
-    
-    /**
-     * Withdraw tokens and any earned yield
-     * The token address to withdraw
-     * The amount to withdraw (0 = withdraw all)
-     */
 
+    /**
+     * @dev Withdraw tokens and any earned yield
+     * @param token The token address to withdraw
+     * @param amount The amount to withdraw (0 = withdraw all)
+     */
     function withdraw(address token, uint256 amount) 
         external 
         nonReentrant 
@@ -153,6 +152,156 @@ contract MiniYield is ReentrancyGuard, Ownable {
         return (userBalance.shares * totalAssets[token]) / totalSupply[token];
     }
 
+    /**
+     * @dev Calculate shares for deposit amount
+     * @param token The token address
+     * @param amount The deposit amount
+     * @return Number of shares to mint
+     */
+    function calculateShares(address token, uint256 amount) public view returns (uint256) {
+        if (totalSupply[token] == 0 || totalAssets[token] == 0) {
+            return amount;
+        }
+        return (amount * totalSupply[token]) / totalAssets[token];
+    }
 
+    /**
+     * @dev Calculate shares to burn for withdrawal
+     * @param token The token address
+     * @param amount The withdrawal amount
+     * @return Number of shares to burn
+     */
+    function calculateSharesToBurn(address token, uint256 amount) public view returns (uint256) {
+        if (totalAssets[token] == 0) return 0;
+        return (amount * totalSupply[token]) / totalAssets[token];
+    }
 
+    // Protocol Management Functions
+
+    /**
+     * @dev Add a new yield protocol for a token
+     * @param token The token address
+     * @param protocol The protocol address
+     */
+    function addProtocol(address token, address protocol) external onlyOwner {
+        supportedProtocols[token].push(ProtocolInfo({
+            protocolAddress: protocol,
+            isActive: true,
+            currentAPY: 0,
+            totalDeposited: 0
+        }));
+        
+        if (!isTokenSupported(token)) {
+            supportedTokens.push(token);
+        }
+    }
+
+    /**
+     * @dev Switch to the best yielding protocol
+     * @param token The token address
+     * @param newProtocolIndex The index of the new protocol
+     */
+    function switchProtocol(address token, uint256 newProtocolIndex) external onlyOwner {
+        require(newProtocolIndex < supportedProtocols[token].length, "Invalid protocol index");
+        require(supportedProtocols[token][newProtocolIndex].isActive, "Protocol not active");
+        
+        uint256 currentProtocolIndex = activeProtocolIndex[token];
+        string memory fromProtocol = IYieldProtocol(supportedProtocols[token][currentProtocolIndex].protocolAddress).getProtocolName();
+        string memory toProtocol = IYieldProtocol(supportedProtocols[token][newProtocolIndex].protocolAddress).getProtocolName();
+        
+        // Get current balance from old protocol
+        uint256 currentBalance = totalAssets[token];
+        
+        if (currentBalance > 0) {
+            // Withdraw from current protocol
+            _withdrawFromActiveProtocol(token, currentBalance);
+            
+            // Switch to new protocol
+            activeProtocolIndex[token] = newProtocolIndex;
+            
+            // Deposit to new protocol
+            _depositToActiveProtocol(token, currentBalance);
+            
+            emit ProtocolSwitch(token, fromProtocol, toProtocol, currentBalance, block.timestamp);
+        } else {
+            activeProtocolIndex[token] = newProtocolIndex;
+        }
+    }
+
+    // Internal Functions
+    
+    function _depositToActiveProtocol(address token, uint256 amount) internal {
+        uint256 protocolIndex = activeProtocolIndex[token];
+        address protocolAddress = supportedProtocols[token][protocolIndex].protocolAddress;
+        
+        IERC20(token).safeApprove(protocolAddress, amount);
+        require(
+            IYieldProtocol(protocolAddress).deposit(token, amount),
+            "Protocol deposit failed"
+        );
+        
+        supportedProtocols[token][protocolIndex].totalDeposited += amount;
+    }
+    
+    function _withdrawFromActiveProtocol(address token, uint256 amount) internal {
+        uint256 protocolIndex = activeProtocolIndex[token];
+        address protocolAddress = supportedProtocols[token][protocolIndex].protocolAddress;
+        
+        require(
+            IYieldProtocol(protocolAddress).withdraw(token, amount),
+            "Protocol withdrawal failed"
+        );
+        
+        supportedProtocols[token][protocolIndex].totalDeposited = 
+            supportedProtocols[token][protocolIndex].totalDeposited > amount ? 
+            supportedProtocols[token][protocolIndex].totalDeposited - amount : 0;
+    }
+
+    // View Functions
+    
+    function isTokenSupported(address token) public view returns (bool) {
+        for (uint256 i = 0; i < supportedTokens.length; i++) {
+            if (supportedTokens[i] == token) return true;
+        }
+        return false;
+    }
+
+    function getProtocolCount(address token) external view returns (uint256) {
+        return supportedProtocols[token].length;
+    }
+
+    function getActiveProtocol(address token) external view returns (address, string memory) {
+        uint256 protocolIndex = activeProtocolIndex[token];
+        address protocolAddress = supportedProtocols[token][protocolIndex].protocolAddress;
+        string memory protocolName = IYieldProtocol(protocolAddress).getProtocolName();
+        return (protocolAddress, protocolName);
+    }
+
+    function getSupportedTokens() external view returns (address[] memory) {
+        return supportedTokens;
+    }
+
+    // Admin Functions
+    
+    function updatePerformanceFee(uint256 newFee) external onlyOwner {
+        require(newFee <= MAX_PERFORMANCE_FEE, "Fee too high");
+        performanceFee = newFee;
+    }
+
+    function updateFeeCollector(address newCollector) external onlyOwner {
+        require(newCollector != address(0), "Invalid address");
+        feeCollector = newCollector;
+    }
+
+    function pause() external onlyOwner {
+        paused = true;
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+    }
+
+    function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
+        IERC20(token).safeTransfer(owner(), amount);
+    }
 }
