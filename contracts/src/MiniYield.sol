@@ -102,7 +102,7 @@ contract MiniYield is ReentrancyGuard, Ownable {
      * The token address to withdraw
      * The amount to withdraw (0 = withdraw all)
      */
-     
+
     function withdraw(address token, uint256 amount) 
         external 
         nonReentrant 
@@ -140,7 +140,18 @@ contract MiniYield is ReentrancyGuard, Ownable {
         emit Withdraw(msg.sender, token, withdrawAmount, block.timestamp);
     }
 
-
+    /**
+     * @dev Get user's total value including earned yield
+     * @param user The user address
+     * @param token The token address
+     * @return The total value of user's position
+     */
+    function getUserTotalValue(address user, address token) public view returns (uint256) {
+        UserBalance memory userBalance = userBalances[user][token];
+        if (userBalance.shares == 0 || totalSupply[token] == 0) return 0;
+        
+        return (userBalance.shares * totalAssets[token]) / totalSupply[token];
+    }
 
 
 
