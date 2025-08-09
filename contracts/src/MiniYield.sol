@@ -31,4 +31,19 @@ contract MiniYield is ReentrancyGuard, Ownable {
         uint256 totalDeposited;
     }
 
+    // State variables
+    mapping(address => mapping(address => UserBalance)) public userBalances; // user -> token -> balance
+    mapping(address => ProtocolInfo[]) public supportedProtocols; // token -> protocols array
+    mapping(address => uint256) public activeProtocolIndex; // token -> active protocol index
+    mapping(address => uint256) public totalSupply; // token -> total supply of shares
+    mapping(address => uint256) public totalAssets; // token -> total assets managed
+    
+    address[] public supportedTokens;
+    uint256 public constant PRECISION = 1e18;
+    uint256 public performanceFee = 100; // 1% = 100 basis points
+    uint256 public constant MAX_PERFORMANCE_FEE = 2000; // Max 20%
+    
+    address public feeCollector;
+    bool public paused = false;
+
 }
